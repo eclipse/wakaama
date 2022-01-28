@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.13)
 
 project(lwm2mclient C)
 
-option(DTLS "Enable DTLS" OFF)
-
 include(${CMAKE_CURRENT_LIST_DIR}/../../core/wakaama.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../../coap/coap.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../../data/data.cmake)
@@ -22,7 +20,7 @@ if(LWM2M_RAW_BLOCK1_REQUESTS)
     add_compile_definitions(LWM2M_RAW_BLOCK1_REQUESTS)
 endif()
 
-include_directories (${WAKAAMA_HEADERS_DIR} ${COAP_HEADERS_DIR} ${DATA_HEADERS_DIR} ${WAKAAMA_SOURCES_DIR} ${SHARED_INCLUDE_DIRS})
+include_directories (${WAKAAMA_HEADERS_DIR} ${COAP_HEADERS_DIR} ${DATA_HEADERS_DIR} ${WAKAAMA_SOURCES_DIR} ${SHARED_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR})
 
 SET(SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/lwm2mclient.c
@@ -40,5 +38,18 @@ SET(SOURCES
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${WAKAAMA_SOURCES} ${COAP_SOURCES} ${DATA_SOURCES} ${SHARED_SOURCES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC ${SHARED_DEFINITIONS})
+
+if (DTLS_TINYDTLS)
+    target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        tinydtls
+    )
+elseif (DTLS_MBEDTLS)
+    target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        mbedtls
+    )
+endif()
 
 SOURCE_GROUP(wakaama FILES ${WAKAAMA_SOURCES})

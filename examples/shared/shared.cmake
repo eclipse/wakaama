@@ -8,26 +8,26 @@ set(SHARED_SOURCES
     ${SHARED_SOURCES_DIR}/memtrace.c
 )
 
-if(DTLS)
-    include(${CMAKE_CURRENT_LIST_DIR}/tinydtls.cmake)
+set(SHARED_DEFINITIONS "")
 
-    set(SHARED_SOURCES
-        ${SHARED_SOURCES}
-        ${TINYDTLS_SOURCES}
-        ${SHARED_SOURCES_DIR}/dtlsconnection.c
-    )
+if(DTLS_TINYDTLS)
 
-    set(SHARED_INCLUDE_DIRS
-        ${SHARED_SOURCES_DIR}
-        ${TINYDTLS_SOURCES_DIR}
-    )
+    list(APPEND SHARED_SOURCES ${SHARED_SOURCES_DIR}/tinydtlsconnection.c)
 
-    add_compile_definitions(WITH_TINYDTLS)
-else()
-    set(SHARED_SOURCES
-        ${SHARED_SOURCES}
-        ${SHARED_SOURCES_DIR}/connection.c
-    )
+    list(APPEND SHARED_DEFINITIONS DTLS)
 
-    set(SHARED_INCLUDE_DIRS ${SHARED_SOURCES_DIR})
+elseif(DTLS_MBEDTLS)
+
+    list(APPEND SHARED_SOURCES ${SHARED_SOURCES_DIR}/mbedtlsconnection.c)
+    
+    list(APPEND SHARED_DEFINITIONS DTLS)
 endif()
+
+set(SHARED_INCLUDE_DIRS ${SHARED_SOURCES_DIR})
+
+
+set(SHARED_SOURCES
+    ${SHARED_SOURCES}
+    ${SHARED_SOURCES_DIR}/connection.c
+    ${SHARED_SOURCES_DIR}/object_utils.c
+)

@@ -9,6 +9,11 @@ include(${CMAKE_CURRENT_LIST_DIR}/../coap/coap.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../data/data.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/../examples/shared/shared.cmake)
 
+if(DTLS)
+    list(REMOVE_ITEM SHARED_DEFINITIONS DTLS)
+endif()
+
+add_compile_definitions(SHARED_DEFINITIONS)
 add_compile_definitions(LWM2M_CLIENT_MODE)
 add_compile_definitions(LWM2M_SUPPORT_TLV)
 add_compile_definitions(LWM2M_SUPPORT_JSON)
