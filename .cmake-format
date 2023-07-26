@@ -15,3 +15,16 @@ with section("format"):
 with section("markup"):
   # What character to use for bulleted lists
   bullet_char = '-'
+
+additional_commands = {
+  "add_fuzzing_test": {
+    "kwargs": {
+      "TARGET_NAME": '*',
+      "SOURCE_FILES": '*',
+      "COMPILE_DEFINITIONS": '*',
+      "CORPUS_DIRS": '*',
+      "MAX_LEN": '*',
+      "CRASH_FILES_DIR": '*',
+    }
+  }
+}

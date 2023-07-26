@@ -38,3 +38,5 @@ endif()
 
 # Add our unit tests to the "test" target
 add_test(NAME lwm2munittests_test COMMAND lwm2munittests)
+
+add_subdirectory(fuzzing)
