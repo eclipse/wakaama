@@ -98,6 +98,11 @@ int main(void) {
        goto exit;
 #endif
 
+#if LWM2M_LOG_LEVEL != LWM2M_LOG_DISABLED
+   if (CUE_SUCCESS != create_logging_test_suit())
+       goto exit;
+#endif
+
    CU_basic_set_mode(CU_BRM_VERBOSE);
    CU_basic_run_tests();
    CU_basic_show_failures(CU_get_failure_list());

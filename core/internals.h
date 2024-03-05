@@ -64,31 +64,78 @@
 
 #include "er-coap-13/er-coap-13.h"
 
-#ifdef LWM2M_WITH_LOGS
-#include <inttypes.h>
-#define LOG(STR) lwm2m_printf("[%s:%d] " STR "\r\n", __func__ , __LINE__)
-#define LOG_ARG(FMT, ...) lwm2m_printf("[%s:%d] " FMT "\r\n", __func__ , __LINE__ , __VA_ARGS__)
-#ifdef LWM2M_VERSION_1_0
-#define LOG_URI(URI)                                                                \
-{                                                                                   \
-    if ((URI) == NULL) lwm2m_printf("[%s:%d] NULL\r\n", __func__ , __LINE__);       \
-    else                                                                            \
-    {                                                                               \
-        lwm2m_printf("[%s:%d] /%d", __func__ , __LINE__ , (URI)->objectId);         \
-        if (LWM2M_URI_IS_SET_INSTANCE(URI)) lwm2m_printf("/%d", (URI)->instanceId); \
-        if (LWM2M_URI_IS_SET_RESOURCE(URI)) lwm2m_printf("/%d", (URI)->resourceId); \
-        lwm2m_printf("\r\n");                                                       \
-    }                                                                               \
-}
-#else
-#define LOG_URI(URI)                                                                \
-    if ((URI) == NULL) lwm2m_printf("[%s:%d] NULL\r\n", __func__ , __LINE__);       \
-    else if (!LWM2M_URI_IS_SET_OBJECT(URI)) lwm2m_printf("[%s:%d] /\r\n", __func__ , __LINE__); \
-    else if (!LWM2M_URI_IS_SET_INSTANCE(URI)) lwm2m_printf("[%s:%d] /%d\r\n", __func__ , __LINE__, (URI)->objectId); \
-    else if (!LWM2M_URI_IS_SET_RESOURCE(URI)) lwm2m_printf("[%s:%d] /%d/%d\r\n", __func__ , __LINE__, (URI)->objectId, (URI)->instanceId); \
-    else if (!LWM2M_URI_IS_SET_RESOURCE_INSTANCE(URI)) lwm2m_printf("[%s:%d] /%d/%d/%d\r\n", __func__ , __LINE__, (URI)->objectId, (URI)->instanceId, (URI)->resourceId); \
-    else lwm2m_printf("[%s:%d] /%d/%d/%d/%d\r\n", __func__ , __LINE__, (URI)->objectId, (URI)->instanceId, (URI)->resourceId, (URI)->resourceInstanceId)
+#define LWM2M_DBG (10)
+#define LWM2M_INFO (20)
+#define LWM2M_WARN (30)
+#define LWM2M_ERR (40)
+#define LWM2M_FATAL (50)
+#define LWM2M_LOG_DISABLED (0xff)
+
+#ifndef LWM2M_LOG_LEVEL
+#define LWM2M_LOG_LEVEL LWM2M_LOG_DISABLED
 #endif
+
+#if LWM2M_LOG_LEVEL != LWM2M_LOG_DISABLED
+#include <inttypes.h>
+
+#ifdef _WIN32
+#define LWM2M_NEW_LINE "\r\n"
+#else
+#define LWM2M_NEW_LINE "\n"
+#endif
+
+#ifndef LWM2M_MAX_LOG_MSG_TXT_SIZE
+#define LWM2M_MAX_LOG_MSG_TXT_SIZE 200
+#endif
+
+typedef enum {
+    LWM2M_LOGGING_DBG = (uint8_t)LWM2M_DBG,
+    LWM2M_LOGGING_INFO = (uint8_t)LWM2M_INFO,
+    LWM2M_LOGGING_WARN = (uint8_t)LWM2M_WARN,
+    LWM2M_LOGGING_ERR = (uint8_t)LWM2M_ERR,
+    LWM2M_LOGGING_FATAL = (uint8_t)LWM2M_FATAL
+} lwm2m_logging_level_t;
+
+/* clang-format off */
+#define STR_LOGGING_LEVEL(level) \
+((level) == LWM2M_LOGGING_DBG ? "DBG" : \
+((level) == LWM2M_LOGGING_INFO ? "INFO" : \
+((level) == LWM2M_LOGGING_WARN ? "WARN" : \
+((level) == LWM2M_LOGGING_ERR ? "ERR" : \
+((level) == LWM2M_LOGGING_FATAL ? "FATAL" : \
+"unknown")))))
+/* clang-format on */
+
+/** Format the message part of a log entry. This function is not thread save.
+ * This function should not be called directly. It's used internally in the logging system. */
+char *lwm2m_log_fmt_message(const char *fmt, ...);
+
+/** The default log handler for an log entry. To define a custom log handler define `LWM2M_LOG_CUSTOM_HANDLER` and
+ * implement a function with this signature.
+ * This function should not be called directly. Use the logging macros instead. */
+void lwm2m_log_handler(lwm2m_logging_level_t level, const char *const msg, const char *const func, const int line,
+                       const char *const file);
+
+/** Basic logging macro. Usually this is not called directly. Use the macros for a given level (e.g. LOG_DBG).
+ * Supports arguments if the message (including format specifiers) is a string literal. Otherwise the use uf
+ * LOG_ARG_DBG (and related macros) are needed.
+ * The limitation that the message needs to be a literal string is due to C11 limitations regarding empty __VA_ARGS__
+ * preceded by an coma. The workaround is inspired by: https://stackoverflow.com/a/53875012 */
+#define LOG_L(LEVEL, ...) LOG_ARG_L_INTERNAL(LEVEL, __VA_ARGS__, '\0')
+
+/* For internal use only. Required for workaround with empty __VA_ARGS__ in C11 */
+#define LOG_ARG_L_INTERNAL(LEVEL, FMT, ...) LOG_ARG_L(LEVEL, FMT "%c", __VA_ARGS__)
+
+/** Basic logging macro that supports arguments. Usually this is not called directly. Use the macros for a given level
+ * (e.g. LOG_ARG_DBG). */
+#define LOG_ARG_L(LEVEL, FMT, ...)                                                                                     \
+    do {                                                                                                               \
+        char *txt = lwm2m_log_fmt_message(FMT, __VA_ARGS__);                                                           \
+        lwm2m_log_handler(LEVEL, txt, __func__, __LINE__, __FILE__);                                                   \
+    } while (0)
+
+#define LOG_URI_TO_STRING(URI) uri_logging_to_string(URI)
+
 /* clang-format off */
 #define STR_STATUS(S)                                           \
 ((S) == STATE_DEREGISTERED ? "STATE_DEREGISTERED" :             \
@@ -144,12 +191,54 @@
 ((S) == STATE_READY ? "STATE_READY" :      \
 "Unknown"))))))
 /* clang-format on */
+
 #define STR_NULL2EMPTY(S) ((const char *)(S) ? (const char *)(S) : "")
-#else
-#define LOG_ARG(FMT, ...)
-#define LOG(STR)
-#define LOG_URI(URI)
 #endif
+
+#if LWM2M_LOG_LEVEL <= LWM2M_DBG
+#define LOG_DBG(...) LOG_L(LWM2M_LOGGING_DBG, __VA_ARGS__)
+#define LOG_ARG_DBG(STR, ...) LOG_ARG_L(LWM2M_LOGGING_DBG, STR, __VA_ARGS__)
+#else
+#define LOG_DBG(...)
+#define LOG_ARG_DBG(STR, ...)
+#endif
+
+#if LWM2M_LOG_LEVEL <= LWM2M_INFO
+#define LOG_INFO(...) LOG_L(LWM2M_LOGGING_INFO, __VA_ARGS__)
+#define LOG_ARG_INFO(STR, ...) LOG_ARG_L(LWM2M_LOGGING_INFO, STR, __VA_ARGS__)
+#else
+#define LOG_INFO(...)
+#define LOG_ARG_INFO(STR, ...)
+#endif
+
+#if LWM2M_LOG_LEVEL <= LWM2M_WARN
+#define LOG_WARN(...) LOG_L(LWM2M_LOGGING_WARN, __VA_ARGS__)
+#define LOG_ARG_WARN(STR, ...) LOG_ARG_L(LWM2M_LOGGING_WARN, STR, __VA_ARGS__)
+#else
+#define LOG_WARN(...)
+#define LOG_ARG_WARN(STR, ...)
+#endif
+
+#if LWM2M_LOG_LEVEL <= LWM2M_ERR
+#define LOG_ERR(...) LOG_L(LWM2M_LOGGING_ERR, __VA_ARGS__)
+#define LOG_ARG_ERR(STR, ...) LOG_ARG_L(LWM2M_LOGGING_ERR, STR, __VA_ARGS__)
+#else
+#define LOG_ERR(...)
+#define LOG_ARG_ERR(STR, ...)
+#endif
+
+#if LWM2M_LOG_LEVEL <= LWM2M_FATAL
+#define LOG_FATAL(...) LOG_L(LWM2M_LOGGING_FATAL, __VA_ARGS__)
+#define LOG_ARG_FATAL(STR, ...) LOG_ARG_L(LWM2M_LOGGING_FATAL, STR, __VA_ARGS__)
+#else
+#define LOG_FATAL(...)
+#define LOG_ARG_FATAL(STR, ...)
+#endif
+
+/* Legacy logging macros. Replace with `LOG_DBG` and related. */
+#define LOG(STR) LOG_DBG(STR)
+#define LOG_ARG(STR, ...) LOG_ARG_DBG(STR, __VA_ARGS__)
+#define LOG_URI(URI) LOG_ARG_DBG("%s", LOG_URI_TO_STRING(URI))
 
 #define LWM2M_DEFAULT_LIFETIME  86400
 
